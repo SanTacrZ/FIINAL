@@ -1,21 +1,13 @@
-import java.nio.file.Paths;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.io.*;
+import java.text.DecimalFormat;
 
 public class App {
-    public static String formatMessage(String text, String textColor) {
-    // Ejemplo de uso: formatMessage("Texto de color verde", "\u001B[32m");
-    return textColor + text + "\u001B[0m"; // Restablece el color
-}
-    String Verde = formatMessage("Este mensaje es verde", "\u001B[32m");
-    String Rosa = formatMessage("Este mensaje es rosa", "\u001B[35m");
-    String Azul = formatMessage("Este mensaje es azul", "\u001B[34m");
-
-
     public static void main(String[] args) throws Exception {
         Map<String, List<Transaccion>> transaccionesPorDia = cargarDatos();
         
@@ -51,20 +43,39 @@ public class App {
                             System.out.println("\u001B[0m");
                     break;
                 case 3:
-                      System.out.print("Ingrese el ID de la transacción a buscar: ");
-                    String idBuscado = scanner.next();
-                    ResultadoBusqueda resultado = buscarTransaccionPorID(transaccionesPorDia, idBuscado);
-                    if (resultado != null) {
-                        System.out.println("\u001B[35m" );
-                        System.out.println("Información de la transacción encontrada:\n[+]");
-                        System.out.println("Día: " + resultado.getDia());
-                        System.out.println("Posición: " + resultado.getPosicion());
-                        System.out.println("Transacción: " + resultado.getTransaccion());
-                        System.out.println("\u001B[0m");
-                    } else {
-                        System.out.println("No se encontró ninguna transacción con el ID proporcionado.");
-                    }
-                    break;
+    System.out.print("Ingrese el ID de la transacción a buscar: ");
+    String idBuscado = scanner.next();
+    ResultadoBusqueda resultado = buscarTransaccionPorID(transaccionesPorDia, idBuscado);
+
+    if (resultado != null) {
+        System.out.println("\u001B[35m");
+        System.out.println("Información de la transacción encontrada:\n[+]");
+        System.out.println("Día: " + resultado.getDia());
+        System.out.println("Posición: " + resultado.getPosicion());
+        System.out.println("Transacción: " + resultado.getTransaccion());
+        System.out.println("\u001B[0m");
+        
+        // Obtener el tipo de emisor y receptor de la transacción
+        String tipoEmisor = resultado.getTransaccion().getTipoEmisor();
+        String tipoReceptor = resultado.getTransaccion().getTipoReceptor();
+
+        // Calcular el recargo para el tipo de emisor y receptor
+        double recargo = calcularRecargoPorTipoEmisorYReceptor(tipoEmisor, tipoReceptor);
+
+        // Calcular el monto con recargo
+        double surchargedAmount = resultado.getTransaccion().getAmount() * recargo;
+        
+        // Formatear el monto con dos decimales
+        DecimalFormat decimalFormat = new DecimalFormat("#.##");
+        String formattedAmount = decimalFormat.format(surchargedAmount);
+
+        // Mostrar el monto con recargo formateado
+        System.out.println("Monto con recargo: " + formattedAmount);
+    } else {
+        System.out.println("No se encontró ninguna transacción con el ID proporcionado.");
+    }
+    break;
+
                 case 4:
                     System.out.print("Ingrese el día de la semana a visualizar: ");
                     String diaVisualizar = scanner.next();
@@ -150,6 +161,11 @@ public class App {
                 this.hora = Integer.parseInt(partes[4]);
             }
         }
+
+        public void setAmount(double amount) {
+            this.amount = amount;
+        }
+    
        public String formatTransaccion() {
     String formattedTransaccion = "\u001B[34m" // Color azul
             + "+---------------------+\n"
@@ -186,7 +202,7 @@ public class App {
 
     
         
-
+        
         public String getId() {
             return ID;
         }
@@ -231,17 +247,62 @@ public class App {
         }
     }
 
-     
+    public static Map<String, List<Transaccion>> calcularRecargos(Map<String, List<Transaccion>> transacciones) {
+        Map<String, List<Transaccion>> transaccionesConRecargo = new HashMap<>();
 
+        for (Map.Entry<String, List<Transaccion>> entry : transacciones.entrySet()) {
+            String dia = entry.getKey();
+            List<Transaccion> transaccionesDia = entry.getValue();
 
+            for (Transaccion transaccion : transaccionesDia) {
+                double recargo = 1.0;
 
-    // Otras funciones para implementar los requisitos mencionados
-    // ...
+                int tipoEmisor = Integer.parseInt(transaccion.getTipoEmisor());
+                if (tipoEmisor == 2) {
+                    recargo += 0.1; // 10% surcharge for sender type 2
+                } else if (tipoEmisor == 1) {
+                    recargo += 0.15; // 15% surcharge for sender type 1
+                }
 
-    // Función para encontrar el día de la semana con mayor cantidad de dinero movido
-    // ...
-    
-    public static String obtenerDiaMayorCantidadDinero(Map<String, List<Transaccion>> datos) {
+                int tipoReceptor = Integer.parseInt(transaccion.getTipoReceptor());
+                if (tipoReceptor == 2) {
+                    recargo += 0.05; // 5% surcharge for receiver type 2
+                } else if (tipoReceptor == 1) {
+                    recargo += 0.1; // 10% surcharge for receiver type 1
+                }
+
+                double surchargedAmount = Math.round((transaccion.getAmount() * recargo) * 100.0) / 100.0;
+                transaccion.setAmount(surchargedAmount);
+            }
+
+            transaccionesConRecargo.put(dia, transaccionesDia);
+        }
+
+        return transaccionesConRecargo;
+    }
+public static double calcularRecargoPorTipoEmisorYReceptor(String tipoEmisor, String tipoReceptor) {
+    double recargo = 1.0;
+
+    int tipoEmisorInt = Integer.parseInt(tipoEmisor);
+    int tipoReceptorInt = Integer.parseInt(tipoReceptor);
+
+    // Aplica recargos en función de los tipos de emisor y receptor
+    if (tipoEmisorInt == 2) {
+        recargo += 0.1; // 10% de recargo para el tipo de emisor 2
+    } else if (tipoEmisorInt == 1) {
+        recargo += 0.15; // 15% de recargo para el tipo de emisor 1
+    }
+
+    if (tipoReceptorInt == 2) {
+        recargo += 0.05; // 5% de recargo para el tipo de receptor 2
+    } else if (tipoReceptorInt == 1) {
+        recargo += 0.1; // 10% de recargo para el tipo de receptor 1
+    }
+
+    return recargo;
+}
+
+public static String obtenerDiaMayorCantidadDinero(Map<String, List<Transaccion>> datos) {
         String diaMayorCantidadDinero = null;
         double mayorCantidadDinero = 0.0;
 
@@ -352,16 +413,4 @@ public class App {
         System.out.println("No se encontraron datos para el día " + dia);
     }
 }
-
-    // Función para encontrar la hora del día con el promedio de dinero movido más alto
-    // ...
-
-    // Función para buscar una transacción por su ID
-    // ...
-
-    // Función para visualizar datos de un día específico
-    // ...
-
-    // Otras funciones para implementar los requisitos mencionados
-    // ...}
 }
